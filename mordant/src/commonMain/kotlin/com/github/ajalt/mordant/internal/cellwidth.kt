@@ -1,9 +1,6 @@
 package com.github.ajalt.mordant.internal
 
 import com.github.ajalt.mordant.internal.gen.CELL_WIDTH_TABLE
-import com.github.ajalt.mordant.internal.gen.EMOJI_SEQUENCES
-import com.github.ajalt.mordant.internal.gen.IntTrie
-import com.github.ajalt.mordant.internal.gen.couldStartEmojiSeq
 
 
 /*
@@ -46,51 +43,61 @@ internal fun cellWidth(codepoint: Int): Int {
 /** Return the width, in terminal cells, of the given [string]*/
 internal fun stringCellWidth(string: String): Int {
     var sum = 0
-    var sumSinceZwj = 0
-    var zwjSeq: IntTrie? = null
     var prevCodepoint = -1
+    var prevWidth = 0
+    var afterZwj = false
+    var regionalCount = 0
+
     for (codepoint in codepointSequence(string)) {
-        val width = when {
-            // text-presentation selector: keep the default width of the base codepoint
-            codepoint == 0xFE0E -> 0
-            // emoji-presentation selector: widen text-presentation emoji to two cells
-            codepoint == 0xFE0F && isTextPresentationEmoji(prevCodepoint) -> 1
-            // some terminals render these as narrow by default unless FE0F is present
-            isTextPresentationEmoji(codepoint) -> 1
-            else -> cellWidth(codepoint)
-        }
-        if (zwjSeq != null) {
-            sumSinceZwj += width
-            if (codepoint in zwjSeq.values) {
-                sumSinceZwj = 0
+        when {
+            // Variation selector-15 (text presentation): keep the base codepoint narrow.
+            codepoint == 0xFE0E -> {
+                if (prevWidth == 2) sum -= 1
             }
-            zwjSeq = zwjSeq.children[codepoint]
-            if (zwjSeq == null) {
-                // all ZWJ sequences combine to one glyph, which is always an emoji, so add 2 for the width of the
-                // emoji, plus the width of any codepoints since the end of the last complete sequence. Unfortunately,
-                // some of these emoji are wider than two cells, but given that their size is font-dependant and usually
-                // not cell-aligned anyway, there's no perfect solution here. Thanks, unicode.
-                sum += sumSinceZwj + 2
-                sumSinceZwj = 0
-            } else {
-                sumSinceZwj += width
+            // Variation selector-16 (emoji presentation): widen previous glyph if needed.
+            codepoint == 0xFE0F -> {
+                if (prevWidth == 1 && prevCodepoint >= 0) sum += 1
             }
-        } else {
-            // We do a fast range check to skip ZWJ sequence processing for most codepoints
-            if (couldStartEmojiSeq(codepoint)) {
-                zwjSeq = EMOJI_SEQUENCES.children[codepoint]
+            // Zero-width joiner joins the next emoji to the previous glyph.
+            codepoint == 0x200D -> {
+                afterZwj = true
             }
-            if (zwjSeq == null) {
-                sum += width
+            // Fitzpatrick modifiers merge with preceding emoji.
+            codepoint in 0x1F3FB..0x1F3FF -> Unit
+            // Combining enclosing keycap merges with preceding codepoint.
+            codepoint == 0x20E3 -> Unit
+            // Tag characters are invisible modifiers.
+            codepoint in 0xE0020..0xE007F -> Unit
+            // Regional indicator symbols combine in pairs into one 2-cell flag.
+            codepoint in 0x1F1E6..0x1F1FF -> {
+                regionalCount++
+                if (regionalCount % 2 == 1) {
+                    sum += 2
+                    prevWidth = 2
+                }
+                prevCodepoint = codepoint
             }
-        }
-        if (codepoint != 0xFE0E && codepoint != 0xFE0F) {
-            prevCodepoint = codepoint
+            // After a ZWJ, skip width for the next emoji because it combines.
+            afterZwj -> {
+                afterZwj = false
+                regionalCount = 0
+                prevCodepoint = codepoint
+                prevWidth = 0
+            }
+            else -> {
+                regionalCount = 0
+                val width = if (isTextPresentationEmoji(codepoint)) 1 else cellWidth(codepoint)
+                if (width != 0) {
+                    sum += width
+                    prevWidth = if (width > 0) width else 0
+                } else {
+                    prevWidth = 0
+                }
+                prevCodepoint = codepoint
+            }
         }
     }
-    // If we were in a zwj sequence at the end of the string, add whatever was left to the sum
-    return sum + sumSinceZwj
-
+    return sum
 }
 
 private val TEXT_PRESENTATION_EMOJI: IntArray = intArrayOf(
