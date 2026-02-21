@@ -1,8 +1,5 @@
 plugins {
     id("mordant-kotlin-conventions")
-    id("mordant-js-conventions")
-    // Need core here pending https://github.com/JetBrains/markdown/pull/159
-    id("mordant-native-core-conventions")
     id("mordant-publishing-conventions")
 }
 

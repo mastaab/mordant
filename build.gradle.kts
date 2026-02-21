@@ -7,9 +7,7 @@ plugins {
 }
 
 apiValidation {
-    // https://github.com/Kotlin/binary-compatibility-validator/issues/3
-    project("samples").subprojects.mapTo(ignoredProjects) { it.name }
-    project("test").subprojects.mapTo(ignoredProjects) { it.name }
+    // Samples and tests are not included in WireTUI composite mode.
 }
 
 tasks.withType<DokkaMultiModuleTask>().configureEach {
