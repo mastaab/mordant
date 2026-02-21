@@ -56,6 +56,10 @@ internal class CellWidthTest {
             "\uD83D\uDC69\u200D\uD83D\uDC69\u200D\uD83D\uDC66\u200D\uD83D\uDC66",
             2
         ), // Emoji_ZWJ_Sequence ; family: woman, woman, boy, boy (👩‍👩‍👦‍👦)
+        row("\uD83C\uDF21", 1), // 🌡 THERMOMETER (text-presentation default)
+        row("\uD83C\uDF21\uFE0F", 2), // 🌡️ THERMOMETER + VS16 (emoji presentation)
+        row("\uD83D\uDEF0", 1), // 🛰 SATELLITE (text-presentation default)
+        row("\uD83D\uDEF0\uFE0F", 2), // 🛰️ SATELLITE + VS16 (emoji presentation)
 
     ) { str, width ->
         stringCellWidth(str) shouldBe width
